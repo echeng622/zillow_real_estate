@@ -27,7 +27,6 @@ def parse(zipcode,filter=None):
 		parser = html.fromstring(response.text)
 		search_results = parser.xpath("//div[@id='search-results']//article")
 		properties_list = []
-		
 		for properties in search_results:
 			raw_address = properties.xpath(".//span[@itemprop='address']//span[@itemprop='streetAddress']//text()")
 			raw_city = properties.xpath(".//span[@itemprop='address']//span[@itemprop='addressLocality']//text()")
@@ -49,6 +48,10 @@ def parse(zipcode,filter=None):
 			title = ''.join(raw_title) if raw_title else None
 			property_url = "https://www.zillow.com"+url[0] if url else None 
 			is_forsale = properties.xpath('.//span[@class="zsg-icon-for-sale"]')
+			if property_url:
+				property_img_url = img_parse(property_url)
+			else:
+				property_img_url = None 
 			properties = {
 							'address':address,
 							'city':city,
@@ -58,13 +61,36 @@ def parse(zipcode,filter=None):
 							'facts and features':info,
 							'real estate provider':broker,
 							'url':property_url,
-							'title':title
+							'title':title,
+                                                        'img_url':property_img_url
 			}
 			if is_forsale:
 				properties_list.append(properties)
 		return properties_list
 		# except:
 		# 	print ("Failed to process the page",url)
+
+
+def img_parse(url):
+	for i in range(5):
+		# try:
+		headers= {
+					'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+					'accept-encoding':'gzip, deflate, sdch, br',
+					'accept-language':'en-GB,en;q=0.8,en-US;q=0.6,ml;q=0.4',
+					'cache-control':'max-age=0',
+					'upgrade-insecure-requests':'1',
+					'user-agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
+		}
+		response = requests.get(url,headers=headers)
+		print(response.status_code)
+		parser = html.fromstring(response.text)
+		search_results = parser.xpath("//img[@class='hip-photo']")
+		properties_list = []
+		for properties in search_results:
+			a = properties.xpath("@src | @href")
+			properties_list.append(a)
+		return properties_list
 
 if __name__=="__main__":
 	argparser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -82,7 +108,7 @@ if __name__=="__main__":
 	scraped_data = parse(zipcode,sort)
 	print ("Writing data to output file")
 	with open("properties-%s.csv"%(zipcode),'wb')as csvfile:
-		fieldnames = ['title','address','city','state','postal_code','price','facts and features','real estate provider','url']
+		fieldnames = ['title','address','city','state','postal_code','price','facts and features','real estate provider','url', 'img_url']
 		writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 		writer.writeheader()
 		for row in  scraped_data:
